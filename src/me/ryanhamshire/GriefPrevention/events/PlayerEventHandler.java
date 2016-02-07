@@ -24,6 +24,7 @@
  */
 package me.ryanhamshire.GriefPrevention.events;
 
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
 import me.ryanhamshire.GriefPrevention.AutoExtendClaimTask;
 import me.ryanhamshire.GriefPrevention.CheckForPortalTrapTask;
@@ -33,6 +34,7 @@ import me.ryanhamshire.GriefPrevention.CreateClaimResult;
 import me.ryanhamshire.GriefPrevention.CustomLogEntryTypes;
 import me.ryanhamshire.GriefPrevention.DataStore;
 import me.ryanhamshire.GriefPrevention.EquipShovelProcessingTask;
+import me.ryanhamshire.GriefPrevention.FlagPermissions;
 import me.ryanhamshire.GriefPrevention.GriefPrevention;
 import me.ryanhamshire.GriefPrevention.IpBanInfo;
 import me.ryanhamshire.GriefPrevention.Messages;
@@ -1096,11 +1098,22 @@ public class PlayerEventHandler {
         }
 
         if (event instanceof InteractEntityEvent.Primary) {
+            if (player.getPermissionValue(ImmutableSet.of(claim.getContext()), FlagPermissions.PERMISSION_INTERACT_PRIMARY) == Tristate.FALSE) {
+                event.setCancelled(true);
+            }
             if (claim != null && claim.allowAccess(player.getWorld(), player) != null) {
                 event.setCancelled(true);
             }
             return;
         }
+
+        if (event instanceof InteractEntityEvent.Secondary) {
+            if (player.getPermissionValue(ImmutableSet.of(claim.getContext()), FlagPermissions.PERMISSION_INTERACT_SECONDARY) == Tristate.FALSE) {
+                event.setCancelled(true);
+                return;
+            }
+        }
+
         // if entity is tameable and has an owner, apply special rules
         if (entity.supports(TameableData.class)) {
             TameableData data = entity.getOrCreate(TameableData.class).get();
