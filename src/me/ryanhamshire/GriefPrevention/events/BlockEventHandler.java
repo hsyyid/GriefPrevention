@@ -25,8 +25,10 @@
 package me.ryanhamshire.GriefPrevention.events;
 
 import com.flowpowered.math.vector.Vector3i;
+import com.google.common.collect.ImmutableSet;
 import me.ryanhamshire.GriefPrevention.Claim;
 import me.ryanhamshire.GriefPrevention.DataStore;
+import me.ryanhamshire.GriefPrevention.FlagPermissions;
 import me.ryanhamshire.GriefPrevention.GriefPrevention;
 import me.ryanhamshire.GriefPrevention.Messages;
 import me.ryanhamshire.GriefPrevention.PlayerData;
@@ -196,6 +198,13 @@ public class BlockEventHandler {
             for (Transaction<BlockSnapshot> transaction : transactions) {
                 // make sure the player is allowed to break at the location
                 String noBuildReason = GriefPrevention.instance.allowBreak(player.get(), transaction.getOriginal());
+                Claim claim = this.dataStore.getClaimAt(transaction.getOriginal().getLocation().get(), false, null);
+                if (claim != null) {
+                    if (player.get().getPermissionValue(ImmutableSet.of(claim.getContext()), FlagPermissions.PERMISSION_BLOCK_BREAK) == Tristate.FALSE) {
+                        event.setCancelled(true);
+                        return;
+                    }
+                }
                 if (noBuildReason != null) {
                     if (event.getCause().root() instanceof Player) {
                         GriefPrevention.sendMessage(player.get(), Text.of(TextMode.Err, noBuildReason));
@@ -311,6 +320,11 @@ public class BlockEventHandler {
             Claim claim = this.dataStore.getClaimAt(block.getLocation().get(), true, playerData.lastClaim);
 
             if (claim != null) {
+                if (player.getPermissionValue(ImmutableSet.of(claim.getContext()), FlagPermissions.PERMISSION_BLOCK_PLACE) == Tristate.FALSE) {
+                    event.setCancelled(true);
+                    return;
+                }
+
                 playerData.lastClaim = claim;
     
                 // warn about TNT not destroying claimed blocks
