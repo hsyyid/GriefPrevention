@@ -200,9 +200,13 @@ public class BlockEventHandler {
                 String noBuildReason = GriefPrevention.instance.allowBreak(player.get(), transaction.getOriginal());
                 Claim claim = this.dataStore.getClaimAt(transaction.getOriginal().getLocation().get(), false, null);
                 if (claim != null) {
-                    if (player.get().getPermissionValue(ImmutableSet.of(claim.getContext()), FlagPermissions.PERMISSION_BLOCK_BREAK) == Tristate.FALSE) {
+                    Tristate value = player.get().getPermissionValue(ImmutableSet.of(claim.getContext()), FlagPermissions.PERMISSION_BLOCK_BREAK);
+                    if (value == Tristate.FALSE) {
                         event.setCancelled(true);
                         return;
+                    }
+                    else if (value == Tristate.TRUE) {
+                        continue;
                     }
                 }
                 if (noBuildReason != null) {
@@ -320,9 +324,13 @@ public class BlockEventHandler {
             Claim claim = this.dataStore.getClaimAt(block.getLocation().get(), true, playerData.lastClaim);
 
             if (claim != null) {
-                if (player.getPermissionValue(ImmutableSet.of(claim.getContext()), FlagPermissions.PERMISSION_BLOCK_PLACE) == Tristate.FALSE) {
+                Tristate value = player.getPermissionValue(ImmutableSet.of(claim.getContext()), FlagPermissions.PERMISSION_BLOCK_PLACE);
+                if (value == Tristate.FALSE) {
                     event.setCancelled(true);
                     return;
+                }
+                else if (value == Tristate.TRUE) {
+                    continue;
                 }
 
                 playerData.lastClaim = claim;

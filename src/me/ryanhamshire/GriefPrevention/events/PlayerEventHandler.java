@@ -956,6 +956,19 @@ public class PlayerEventHandler {
 
         Player player = event.getCause().first(Player.class).get();
 
+        for (Entity entity : event.getEntities()) {
+            Claim claim = this.dataStore.getClaimAt(entity.getLocation(), false, null);
+            Tristate value = player.getPermissionValue(ImmutableSet.of(claim.getContext()), FlagPermissions.PERMISSION_ITEM_DROP);
+            if (claim != null) {
+                if (value == Tristate.FALSE) {
+                    event.setCancelled(true);
+                    return;
+                }
+                else if (value == Tristate.TRUE) {
+                    continue;
+                }
+            }
+        }
         // in creative worlds, dropping items is blocked
         if (GriefPrevention.instance.claimModeIsActive(player.getLocation().getExtent().getProperties(), ClaimsMode.Creative)) {
             event.setCancelled(true);
@@ -1098,18 +1111,26 @@ public class PlayerEventHandler {
         }
 
         if (event instanceof InteractEntityEvent.Primary) {
-            if (player.getPermissionValue(ImmutableSet.of(claim.getContext()), FlagPermissions.PERMISSION_INTERACT_PRIMARY) == Tristate.FALSE) {
+            Tristate value = player.getPermissionValue(ImmutableSet.of(claim.getContext()), FlagPermissions.PERMISSION_INTERACT_PRIMARY);
+            if (value == Tristate.FALSE) {
                 event.setCancelled(true);
             }
+            else if (value == Tristate.TRUE) {
+                return;
+            }
+  
             if (claim != null && claim.allowAccess(player.getWorld(), player) != null) {
                 event.setCancelled(true);
+                return;
             }
-            return;
         }
 
         if (event instanceof InteractEntityEvent.Secondary) {
-            if (player.getPermissionValue(ImmutableSet.of(claim.getContext()), FlagPermissions.PERMISSION_INTERACT_SECONDARY) == Tristate.FALSE) {
+            Tristate value = player.getPermissionValue(ImmutableSet.of(claim.getContext()), FlagPermissions.PERMISSION_INTERACT_SECONDARY);
+            if (value == Tristate.FALSE) {
                 event.setCancelled(true);
+            }
+            else if (value == Tristate.TRUE) {
                 return;
             }
         }
