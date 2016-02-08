@@ -28,14 +28,16 @@ import com.google.common.collect.ImmutableSet;
 import me.ryanhamshire.GriefPrevention.Claim;
 import me.ryanhamshire.GriefPrevention.ClaimsMode;
 import me.ryanhamshire.GriefPrevention.DataStore;
-import me.ryanhamshire.GriefPrevention.FlagPermissions;
+import me.ryanhamshire.GriefPrevention.GPPermissions;
 import me.ryanhamshire.GriefPrevention.GriefPrevention;
 import me.ryanhamshire.GriefPrevention.Messages;
 import me.ryanhamshire.GriefPrevention.PlayerData;
 import me.ryanhamshire.GriefPrevention.TextMode;
 import me.ryanhamshire.GriefPrevention.configuration.ClaimStorageData;
 import me.ryanhamshire.GriefPrevention.configuration.GriefPreventionConfig;
+import net.minecraft.entity.EnumCreatureType;
 import net.minecraft.entity.passive.EntityTameable;
+import net.minecraft.world.Explosion;
 import org.spongepowered.api.Sponge;
 import org.spongepowered.api.block.BlockSnapshot;
 import org.spongepowered.api.block.BlockType;
@@ -71,6 +73,7 @@ import org.spongepowered.api.event.entity.DestructEntityEvent;
 import org.spongepowered.api.event.entity.SpawnEntityEvent;
 import org.spongepowered.api.event.filter.IsCancelled;
 import org.spongepowered.api.event.item.inventory.DropItemEvent;
+import org.spongepowered.api.event.world.ExplosionEvent;
 import org.spongepowered.api.item.ItemTypes;
 import org.spongepowered.api.item.inventory.ItemStack;
 import org.spongepowered.api.service.user.UserStorageService;
@@ -82,6 +85,7 @@ import java.util.Arrays;
 import java.util.Calendar;
 import java.util.HashSet;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Predicate;
 
@@ -137,6 +141,36 @@ public class EntityEventHandler {
         }
     }
 
+    @Listener
+    public void onExplosion(ExplosionEvent.Pre event) {
+        Claim claim =  GriefPrevention.instance.dataStore.getClaimAt(event.getTargetWorld().getLocation(event.getExplosion().getOrigin()), false, null);
+
+        if (claim == null) {
+            return;
+        }
+
+        net.minecraft.entity.Entity mcEntity = ((Explosion) event.getExplosion()).exploder;
+        boolean checked = false;
+
+        if (mcEntity != null) {
+            Entity entity = (Entity) mcEntity;
+
+            Optional<UUID> uuid = entity.getCreator();
+            if (uuid.isPresent()) {
+                Optional<User> user = Sponge.getServiceManager().provide(UserStorageService.class).get().get(uuid.get());
+                if(user.isPresent()) {
+                    Tristate value = user.get().getPermissionValue(ImmutableSet.of(claim.getContext()), GPPermissions.EXPLOSIONS);
+                    if (value != Tristate.UNDEFINED) {
+                        event.setCancelled(!value.asBoolean());
+                        return;
+                    }
+                };
+            }
+        }
+
+        event.setCancelled(!claim.getClaimData().getConfig().flags.explosions);
+    }
+
     // when a creature spawns...
     @Listener(order = Order.EARLY)
     public void onSpawnEntity(SpawnEntityEvent event) {
@@ -146,24 +180,31 @@ public class EntityEventHandler {
             public boolean test(Entity entity) {
                 Claim claim = GriefPrevention.instance.dataStore.getClaimAt(entity.getLocation(), false, null);
                 if (claim != null) {
-                    if (user.isPresent()) {
+                    if (user.isPresent() && GriefPrevention.instance.permPluginInstalled) {
+                        net.minecraft.entity.Entity nmsEntity = (net.minecraft.entity.Entity) entity;
                         User spongeUser = user.get();
-                        if (spongeUser.getPermissionValue(ImmutableSet.of(claim.getContext()), FlagPermissions.PERMISSION_SPAWN_ANY) == Tristate.FALSE) {
-                            return false;
-                        } else if (entity instanceof Ambient && spongeUser.getPermissionValue(ImmutableSet.of(claim.getContext()), FlagPermissions
-                                .PERMISSION_SPAWN_AMBIENTS) == Tristate.FALSE) {
-                            return false;
-                        } else if (entity instanceof Aquatic && spongeUser.getPermissionValue(ImmutableSet.of(claim.getContext()), FlagPermissions
-                                .PERMISSION_SPAWN_AQUATICS) == Tristate.FALSE) {
-                            return false;
-                        } else if (entity instanceof Monster && spongeUser.getPermissionValue(ImmutableSet.of(claim.getContext()), FlagPermissions
-                                .PERMISSION_SPAWN_MONSTERS) == Tristate.FALSE) {
-                            return false;
-                        } else if (entity instanceof Creature && spongeUser.getPermissionValue(ImmutableSet.of(claim.getContext()), FlagPermissions
-                                .PERMISSION_SPAWN_PASSIVES) == Tristate.FALSE) {
-                            return false;
+                        Set contextSet = ImmutableSet.of(claim.getContext());
+
+                        if (spongeUser.getPermissionValue(contextSet, GPPermissions.SPAWN_ANY) != Tristate.UNDEFINED) {
+                            return spongeUser.getPermissionValue(contextSet, GPPermissions.SPAWN_ANY) == Tristate.TRUE;
+                        } else if (nmsEntity.isCreatureType(EnumCreatureType.AMBIENT, false)
+                                && spongeUser.getPermissionValue(contextSet, GPPermissions
+                                .SPAWN_AMBIENTS) != Tristate.UNDEFINED) {
+                            return spongeUser.getPermissionValue(contextSet, GPPermissions.SPAWN_AMBIENTS) == Tristate.TRUE;
+                        } else if (nmsEntity.isCreatureType(EnumCreatureType.WATER_CREATURE, false) && spongeUser.getPermissionValue(contextSet,
+                                GPPermissions.SPAWN_AQUATICS) != Tristate.UNDEFINED) {
+                            return spongeUser.getPermissionValue(contextSet, GPPermissions.SPAWN_AQUATICS) == Tristate.TRUE;
+                        } else if (nmsEntity.isCreatureType(EnumCreatureType.MONSTER, false)
+                                && spongeUser.getPermissionValue(contextSet, GPPermissions
+                                .SPAWN_MONSTERS) != Tristate.UNDEFINED) {
+                            return spongeUser.getPermissionValue(contextSet, GPPermissions.SPAWN_MONSTERS) == Tristate.TRUE;
+                        } else if (nmsEntity.isCreatureType(EnumCreatureType.CREATURE, false)
+                                && spongeUser.getPermissionValue(contextSet, GPPermissions
+                                .SPAWN_PASSIVES) != Tristate.UNDEFINED) {
+                            return spongeUser.getPermissionValue(contextSet, GPPermissions.SPAWN_PASSIVES) == Tristate.TRUE;
                         }
                     }
+
                     ClaimStorageData.ClaimDataNode claimStorageData = claim.getClaimData().getConfig();
                     if (!claimStorageData.flags.spawnAny) {
                         return false;
@@ -183,7 +224,7 @@ public class EntityEventHandler {
             if (!GriefPrevention.instance.claimModeIsActive(location.getExtent().getProperties(), ClaimsMode.Creative)) {
                 return;
             }
-    
+
             final Cause cause = event.getCause();
             final Player player = cause.first(Player.class).orElse(null);
             final ItemStack stack = cause.first(ItemStack.class).orElse(null);
@@ -199,7 +240,7 @@ public class EntityEventHandler {
                     return;
                 }
             }
-    
+
             // otherwise, just apply the limit on total entities per claim (and no spawning in the wilderness!)
             Claim claim = this.dataStore.getClaimAt(location, false, null);
             if (claim == null || claim.allowMoreEntities() != null) {
@@ -236,14 +277,15 @@ public class EntityEventHandler {
                 }
             }
         }
+
         // protect pets from environmental damage types which could be easily caused by griefers
         if (event.getTargetEntity() instanceof EntityTameable && !GriefPrevention.instance.pvpRulesApply(event.getTargetEntity().getWorld())) {
             EntityTameable tameable = (EntityTameable) event.getTargetEntity();
             if (tameable.isTamed()) {
                 if (damageSource.getType() == DamageTypes.EXPLOSIVE ||
-                    damageSource.getType() == DamageTypes.CONTACT ||
-                    damageSource.getType() == DamageTypes.FIRE ||
-                    damageSource.getType() == DamageTypes.SUFFOCATE) {
+                        damageSource.getType() == DamageTypes.CONTACT ||
+                        damageSource.getType() == DamageTypes.FIRE ||
+                        damageSource.getType() == DamageTypes.SUFFOCATE) {
                     event.setCancelled(true);
                     return;
                 }
@@ -303,11 +345,11 @@ public class EntityEventHandler {
                     if (!attackerData.ignoreClaims) {
                         // ignore claims mode allows for pvp inside land claims
                         if (attackerClaim != null && !attackerData.inPvpCombat(defender.getWorld()) &&
-                           (attackerClaim.isAdminClaim() && attackerClaim.parent == null
-                         && activeConfig.getConfig().pvp.protectPlayersInAdminClaims ||
-                            attackerClaim.isAdminClaim() && attackerClaim.parent != null
-                         && activeConfig.getConfig().pvp.protectPlayersInAdminSubClaims
-                         || !attackerClaim.isAdminClaim() && activeConfig.getConfig().pvp.protectPlayersInClaims)) {
+                                (attackerClaim.isAdminClaim() && attackerClaim.parent == null
+                                        && activeConfig.getConfig().pvp.protectPlayersInAdminClaims ||
+                                        attackerClaim.isAdminClaim() && attackerClaim.parent != null
+                                                && activeConfig.getConfig().pvp.protectPlayersInAdminSubClaims
+                                        || !attackerClaim.isAdminClaim() && activeConfig.getConfig().pvp.protectPlayersInClaims)) {
                             attackerData.lastClaim = attackerClaim;
                             PreventPvPEvent pvpEvent = new PreventPvPEvent(attackerClaim);
                             Sponge.getGame().getEventManager().post(pvpEvent);
@@ -347,8 +389,9 @@ public class EntityEventHandler {
         // might find ways to steal anyway if theft protection is enabled
 
         // don't track in worlds where claims are not enabled
-        if (!GriefPrevention.instance.claimsEnabledForWorld(event.getTargetEntity().getWorld().getProperties()))
+        if (!GriefPrevention.instance.claimsEnabledForWorld(event.getTargetEntity().getWorld().getProperties())) {
             return;
+        }
 
         // if the damaged entity is a claimed item frame or armor stand, the
         // damager needs to be a player with container trust in the claim
@@ -384,7 +427,7 @@ public class EntityEventHandler {
                 }
 
                 // otherwise player must have container trust in the claim
-                String failureReason = claim.allowBuild(attacker, BlockTypes.AIR);
+                String failureReason = claim.allowBuild(attacker, event.getTargetEntity().getLocation());
                 if (failureReason != null) {
                     event.setCancelled(true);
                     GriefPrevention.sendMessage(attacker, TextMode.Err, failureReason);
@@ -406,13 +449,15 @@ public class EntityEventHandler {
 
                         // if the player interacting is the owner, always
                         // allow
-                        if (attacker.getUniqueId().equals(ownerID))
+                        if (attacker.getUniqueId().equals(ownerID)) {
                             return;
+                        }
 
                         // allow for admin override
                         PlayerData attackerData = this.dataStore.getPlayerData(attacker.getWorld().getProperties(), attacker.getUniqueId());
-                        if (attackerData.ignoreClaims)
+                        if (attackerData.ignoreClaims) {
                             return;
+                        }
 
                         // otherwise disallow in non-pvp worlds
                         if (!GriefPrevention.instance.pvpRulesApply(event.getTargetEntity().getLocation().getExtent())) {
@@ -422,8 +467,9 @@ public class EntityEventHandler {
                                 ownerName = owner.get().getName();
                             }
                             String message = GriefPrevention.instance.dataStore.getMessage(Messages.NoDamageClaimedEntity, ownerName);
-                            if (attacker.hasPermission("griefprevention.ignoreclaims"))
+                            if (attacker.hasPermission(GPPermissions.IGNORE_CLAIMS)) {
                                 message += "  " + GriefPrevention.instance.dataStore.getMessage(Messages.IgnoreClaimsAdvertisement);
+                            }
                             GriefPrevention.sendMessage(attacker, TextMode.Err, message);
                             event.setCancelled(true);
                             return;
@@ -476,17 +522,20 @@ public class EntityEventHandler {
                 }
 
                 // otherwise the player damaging the entity must have permission, unless it's a dog in a pvp world
-                else if (!event.getTargetEntity().getWorld().getProperties().isPVPEnabled() && !(event.getTargetEntity().getType() == EntityTypes.WOLF)) {
-                    String noContainersReason = claim.allowContainers(attacker);
+                else if (!event.getTargetEntity().getWorld().getProperties().isPVPEnabled() && !(event.getTargetEntity().getType()
+                        == EntityTypes.WOLF)) {
+                    String noContainersReason = claim.allowContainers(attacker, event.getTargetEntity().getLocation());
                     if (noContainersReason != null) {
 
                         // kill the arrow to avoid infinite bounce between crowded together animals
-                        if (arrow != null)
+                        if (arrow != null) {
                             arrow.remove();
+                        }
 
                         String message = GriefPrevention.instance.dataStore.getMessage(Messages.NoDamageClaimedEntity, claim.getOwnerName());
-                        if (attacker.hasPermission("griefprevention.ignoreclaims"))
+                        if (attacker.hasPermission(GPPermissions.IGNORE_CLAIMS)) {
                             message += "  " + GriefPrevention.instance.dataStore.getMessage(Messages.IgnoreClaimsAdvertisement);
+                        }
                         GriefPrevention.sendMessage(attacker, TextMode.Err, message);
                         event.setCancelled(true);
                     }
@@ -501,16 +550,15 @@ public class EntityEventHandler {
     }
 
     @Listener(order = Order.POST)
-    public void onEntityDamageMonitor (DamageEntityEvent event)
-    {
+    public void onEntityDamageMonitor(DamageEntityEvent event) {
         //FEATURE: prevent players who very recently participated in pvp combat from hiding inventory to protect it from looting
         //FEATURE: prevent players who are in pvp combat from logging out to avoid being defeated
 
-        if(event.getTargetEntity().getType() != EntityTypes.PLAYER) {
+        if (event.getTargetEntity().getType() != EntityTypes.PLAYER) {
             return;
         }
 
-        Player defender = (Player)event.getTargetEntity();
+        Player defender = (Player) event.getTargetEntity();
 
         //only interested in entities damaging entities (ignoring environmental damage)
         // the rest is only interested in entities damaging entities (ignoring environmental damage)
@@ -521,33 +569,37 @@ public class EntityEventHandler {
         EntityDamageSource entityDamageSource = (EntityDamageSource) event.getCause().root();
 
         //if not in a pvp rules world, do nothing
-        if(!GriefPrevention.instance.pvpRulesApply(defender.getWorld())) return;
+        if (!GriefPrevention.instance.pvpRulesApply(defender.getWorld())) {
+            return;
+        }
 
         //determine which player is attacking, if any
         Player attacker = null;
         Projectile arrow = null;
         Entity damageSource = entityDamageSource.getSource();
 
-        if(damageSource != null) {
-            if(damageSource instanceof Player) {
-                attacker = (Player)damageSource;
-            } else if(damageSource instanceof Projectile) {
-                arrow = (Projectile)damageSource;
-                if(arrow.getShooter() instanceof Player) {
-                    attacker = (Player)arrow.getShooter();
+        if (damageSource != null) {
+            if (damageSource instanceof Player) {
+                attacker = (Player) damageSource;
+            } else if (damageSource instanceof Projectile) {
+                arrow = (Projectile) damageSource;
+                if (arrow.getShooter() instanceof Player) {
+                    attacker = (Player) arrow.getShooter();
                 }
             }
         }
 
         //if attacker not a player, do nothing
-        if(attacker == null) return;
+        if (attacker == null) {
+            return;
+        }
 
         PlayerData defenderData = this.dataStore.getPlayerData(defender.getWorld().getProperties(), defender.getUniqueId());
         PlayerData attackerData = this.dataStore.getPlayerData(attacker.getWorld().getProperties(), attacker.getUniqueId());
         Claim attackerClaim = this.dataStore.getClaimAt(attacker.getLocation(), false, null);
         Claim defenderClaim = this.dataStore.getClaimAt(defender.getLocation(), false, null);
 
-        if(attacker != defender) {
+        if (attacker != defender) {
             long now = Calendar.getInstance().getTimeInMillis();
             if (defenderClaim != null) {
                 if (GriefPrevention.getActiveConfig(defender.getWorld().getProperties()).getConfig().pvp.protectPlayersInClaims) {
@@ -585,9 +637,11 @@ public class EntityEventHandler {
             PlayerData playerData = this.dataStore.getPlayerData(player.getWorld().getProperties(), player.getUniqueId());
 
             // if involved in a siege
-            if (playerData.siegeData != null) { 
+            if (playerData.siegeData != null) {
                 // end it, with the dieing player being the loser
-                this.dataStore.endSiege(playerData.siegeData, event.getCause().first(Player.class).isPresent() ? event.getCause().first(Player.class).get().getName() : null, player.getName(), true /*ended due to death*/);
+                this.dataStore.endSiege(playerData.siegeData,
+                        event.getCause().first(Player.class).isPresent() ? event.getCause().first(Player.class).get().getName() : null,
+                        player.getName(), true);
                 // don't drop items as usual, they will be sent to the siege winner
                 event.setCancelled(true);
             }
@@ -612,30 +666,35 @@ public class EntityEventHandler {
         EntityDamageSource damageSource = event.getCause().first(EntityDamageSource.class).get();
 
         // if involved in a siege
-        if (playerData.siegeData != null) { 
+        if (playerData.siegeData != null) {
             // end it, with the dying player being the loser
-            this.dataStore.endSiege(playerData.siegeData, damageSource.getSource() != null ? ((net.minecraft.entity.Entity) damageSource.getSource()).getName() : null, player.getName(), true /*ended due to death*/);
+            this.dataStore.endSiege(playerData.siegeData,
+                    damageSource.getSource() != null ? ((net.minecraft.entity.Entity) damageSource.getSource()).getName() : null, player.getName(),
+                    true);
         }
     }
 
     // when an item spawns...
     @Listener(order = Order.LAST)
     public void onItemSpawn(SpawnEntityEvent event) {
-        if (event.getEntities().get(0) instanceof Item) {
-            // if in a creative world, cancel the event (don't drop items on the ground)
-            if (GriefPrevention.instance.claimModeIsActive(event.getEntities().get(0).getLocation().getExtent().getProperties(), ClaimsMode.Creative)) {
-                event.setCancelled(true);
+        if (event.getEntities().size() > 0) {
+            if (event.getEntities().get(0) instanceof Item) {
+                // if in a creative world, cancel the event (don't drop items on the ground)
+                if (GriefPrevention.instance
+                        .claimModeIsActive(event.getEntities().get(0).getLocation().getExtent().getProperties(), ClaimsMode.Creative)) {
+                    event.setCancelled(true);
+                    return;
+                }
+            } else {
                 return;
             }
-        } else {
-            return;
         }
     }
 
     public static final HashSet<PotionEffectType> positiveEffects = new HashSet<PotionEffectType>(Arrays.asList(
             PotionEffectTypes.ABSORPTION,
             //PotionEffectTypes.DAMAGE_RESISTANCE,
-           // PotionEffectTypes.FAST_DIGGING,
+            // PotionEffectTypes.FAST_DIGGING,
             PotionEffectTypes.FIRE_RESISTANCE,
             //PotionEffectTypes.HEAL,
             PotionEffectTypes.HEALTH_BOOST,

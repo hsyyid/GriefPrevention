@@ -2,17 +2,14 @@ package me.ryanhamshire.GriefPrevention.command;
 
 import com.google.common.collect.Lists;
 import me.ryanhamshire.GriefPrevention.Claim;
-import me.ryanhamshire.GriefPrevention.FlagPermissions;
 import me.ryanhamshire.GriefPrevention.GriefPrevention;
 import me.ryanhamshire.GriefPrevention.PlayerData;
 import me.ryanhamshire.GriefPrevention.TextMode;
-import me.ryanhamshire.GriefPrevention.configuration.ClaimStorageData;
 import org.spongepowered.api.Sponge;
 import org.spongepowered.api.command.CommandException;
 import org.spongepowered.api.command.CommandResult;
 import org.spongepowered.api.command.CommandSource;
 import org.spongepowered.api.command.args.CommandContext;
-import org.spongepowered.api.command.spec.CommandExecutor;
 import org.spongepowered.api.entity.living.player.Player;
 import org.spongepowered.api.service.pagination.PaginationBuilder;
 import org.spongepowered.api.service.pagination.PaginationService;
@@ -24,7 +21,11 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
-public class CommandClaimFlag implements CommandExecutor {
+public class CommandClaimFlag extends BaseCommand {
+
+    public CommandClaimFlag(String basePerm) {
+        super(basePerm);
+    }
 
     @Override
     public CommandResult execute(CommandSource src, CommandContext ctx) {
@@ -44,7 +45,7 @@ public class CommandClaimFlag implements CommandExecutor {
 
         if (claim != null) {
             if (flag.isPresent() && value.isPresent()) {
-                if (playerData.ignoreClaims || player.hasPermission(FlagPermissions.PERMISSION_FLAGS_COMMAND + "." + flag.get().toLowerCase())) {
+                if (player.hasPermission(this.basePerm + "." + flag.get().toLowerCase())) {
                     if (value.get().equalsIgnoreCase("true") || value.get().equalsIgnoreCase("false")) {
                         setFlagValue(src, claim, flag.get(), Boolean.valueOf(value.get()));
                     } else if (value.get().contains(",") && !ctx.hasAny("r")) {
@@ -69,7 +70,8 @@ public class CommandClaimFlag implements CommandExecutor {
                 List<Text> flagList = Lists.newArrayList();
                 for (String flagName : claim.getClaimData().getConfig().flags.getFlagMap().keySet()) {
                     Text flagValue = Text.builder().append(Text.of(TextColors.GRAY, "Flag: ", flagName, "\n")).append(Text.builder()
-                            .append(Text.of(TextColors.GOLD, "Value: "), Text.of(claim.getClaimData().getConfig().flags.getFlagValue(flagName).toString()),
+                            .append(Text.of(TextColors.GOLD, "Value: "),
+                                    Text.of(claim.getClaimData().getConfig().flags.getFlagValue(flagName).toString()),
                                     Text.of("\n"))
                             .build()).build();
                     flagList.add(flagValue);
@@ -106,8 +108,9 @@ public class CommandClaimFlag implements CommandExecutor {
                 ArrayList<String> newValue = (ArrayList<String>) claim.getClaimData().getConfig().flags.getFlagValue(flag);
                 newValue.removeAll(value);
                 claim.getClaimData().getConfig().flags.setFlagValue(flag, newValue);
-                src.sendMessage(Text.of(TextColors.GREEN, "Set value of ", flag, " to ",claim.getClaimData().getConfig().flags.getFlagValue(flag).toString
-                        ()));
+                src.sendMessage(
+                        Text.of(TextColors.GREEN, "Set value of ", flag, " to ", claim.getClaimData().getConfig().flags.getFlagValue(flag).toString
+                                ()));
             } else {
                 src.sendMessage(Text.of(TextColors.RED, "Value types not compatible!"));
             }
