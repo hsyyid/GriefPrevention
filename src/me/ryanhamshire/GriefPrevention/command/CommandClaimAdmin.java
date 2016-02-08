@@ -3,6 +3,7 @@ package me.ryanhamshire.GriefPrevention.command;
 import me.ryanhamshire.GriefPrevention.GriefPrevention;
 import me.ryanhamshire.GriefPrevention.Messages;
 import me.ryanhamshire.GriefPrevention.PlayerData;
+import me.ryanhamshire.GriefPrevention.ShovelMode;
 import me.ryanhamshire.GriefPrevention.TextMode;
 import org.spongepowered.api.command.CommandException;
 import org.spongepowered.api.command.CommandResult;
@@ -11,7 +12,7 @@ import org.spongepowered.api.command.args.CommandContext;
 import org.spongepowered.api.command.spec.CommandExecutor;
 import org.spongepowered.api.entity.living.player.Player;
 
-public class CommandUnlockDrops implements CommandExecutor {
+public class CommandClaimAdmin implements CommandExecutor {
 
     @Override
     public CommandResult execute(CommandSource src, CommandContext ctx) {
@@ -24,9 +25,8 @@ public class CommandUnlockDrops implements CommandExecutor {
         }
 
         PlayerData playerData = GriefPrevention.instance.dataStore.getPlayerData(player.getWorld(), player.getUniqueId());
-        playerData.dropsAreUnlocked = true;
-        GriefPrevention.sendMessage(player, TextMode.Success, Messages.DropUnlockConfirmation);
-
+        playerData.shovelMode = ShovelMode.Admin;
+        GriefPrevention.sendMessage(player, TextMode.Success, Messages.AdminClaimsMode);
         return CommandResult.success();
     }
 }

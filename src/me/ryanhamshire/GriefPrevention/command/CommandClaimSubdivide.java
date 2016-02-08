@@ -12,7 +12,7 @@ import org.spongepowered.api.command.args.CommandContext;
 import org.spongepowered.api.command.spec.CommandExecutor;
 import org.spongepowered.api.entity.living.player.Player;
 
-public class CommandAdminClaims implements CommandExecutor {
+public class CommandClaimSubdivide implements CommandExecutor {
 
     @Override
     public CommandResult execute(CommandSource src, CommandContext ctx) {
@@ -23,9 +23,13 @@ public class CommandAdminClaims implements CommandExecutor {
             src.sendMessage(e.getText());
             return CommandResult.success();
         }
-        PlayerData playerData = GriefPrevention.instance.dataStore.getPlayerData(player.getUniqueId());
-        playerData.shovelMode = ShovelMode.Admin;
-        GriefPrevention.sendMessage(player, TextMode.Success, Messages.AdminClaimsMode);
+
+        PlayerData playerData = GriefPrevention.instance.dataStore.getPlayerData(player.getWorld(), player.getUniqueId());
+        playerData.shovelMode = ShovelMode.Subdivide;
+        playerData.claimSubdividing = null;
+        GriefPrevention.sendMessage(player, TextMode.Instr, Messages.SubdivisionMode);
+        GriefPrevention.sendMessage(player, TextMode.Instr, Messages.SubdivisionVideo2);
+
         return CommandResult.success();
     }
 }

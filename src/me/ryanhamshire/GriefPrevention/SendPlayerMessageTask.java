@@ -26,7 +26,6 @@ package me.ryanhamshire.GriefPrevention;
 
 import org.spongepowered.api.entity.living.player.Player;
 import org.spongepowered.api.text.Text;
-import org.spongepowered.api.text.Texts;
 
 //sends a message to a player
 //used to send delayed messages, for example help text triggered by a player's chat
@@ -43,19 +42,19 @@ class SendPlayerMessageTask implements Runnable {
     @Override
     public void run() {
         if (player == null) {
-            GriefPrevention.AddLogEntry(Texts.toPlain(message));
+            GriefPrevention.AddLogEntry(Text.of(message).toPlain());
             return;
         }
 
         // if the player is dead, save it for after his respawn
         if (((net.minecraft.entity.player.EntityPlayerMP) this.player).isDead) {
-            PlayerData playerData = GriefPrevention.instance.dataStore.getPlayerData(this.player.getUniqueId());
+            PlayerData playerData = GriefPrevention.instance.dataStore.getPlayerData(this.player.getWorld(), this.player.getUniqueId());
             playerData.messageOnRespawn = this.message;
         }
 
         // otherwise send it immediately
         else {
-            GriefPrevention.sendMessage(this.player, Texts.of(this.message));
+            GriefPrevention.sendMessage(this.player, Text.of(this.message));
         }
     }
 }

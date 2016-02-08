@@ -5,7 +5,7 @@ import org.spongepowered.api.command.CommandSource;
 import org.spongepowered.api.command.args.CommandContext;
 import org.spongepowered.api.command.spec.CommandExecutor;
 
-public class CommandSellClaimBlocks implements CommandExecutor {
+public class CommandClaimSell implements CommandExecutor {
 
     @Override
     public CommandResult execute(CommandSource src, CommandContext ctx) {
@@ -40,7 +40,7 @@ public class CommandSellClaimBlocks implements CommandExecutor {
         int blockCount = blockCountOpt.get();
 
         if (blockCount <= 0) {
-            throw new CommandException(Texts.of("Invalid block count of lte 0"));
+            throw new CommandException(Text.of("Invalid block count of lte 0"));
         }
 
         // if he doesn't have enough blocks, tell him so

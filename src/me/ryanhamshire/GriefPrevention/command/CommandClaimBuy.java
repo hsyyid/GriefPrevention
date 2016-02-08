@@ -5,7 +5,7 @@ import org.spongepowered.api.command.CommandSource;
 import org.spongepowered.api.command.args.CommandContext;
 import org.spongepowered.api.command.spec.CommandExecutor;
 
-public class CommandBuyClaimBlocks implements CommandExecutor {
+public class CommandClaimBuy implements CommandExecutor {
 
     @Override
     public CommandResult execute(CommandSource src, CommandContext ctx) {
@@ -38,7 +38,7 @@ public class CommandBuyClaimBlocks implements CommandExecutor {
             int blockCount = blockCountOpt.get();
 
             if (blockCount <= 0) {
-                throw new CommandException(Texts.of("Invalid block count of lte 0"));
+                throw new CommandException(Text.of("Invalid block count of lte 0"));
             }
 
             // if the player can't afford his purchase, send error message

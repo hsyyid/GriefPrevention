@@ -1,5 +1,6 @@
 package me.ryanhamshire.GriefPrevention.command;
 
+import com.google.common.collect.ImmutableSet;
 import me.ryanhamshire.GriefPrevention.Claim;
 import me.ryanhamshire.GriefPrevention.GriefPrevention;
 import me.ryanhamshire.GriefPrevention.Messages;
@@ -13,7 +14,9 @@ import org.spongepowered.api.command.args.CommandContext;
 import org.spongepowered.api.command.spec.CommandExecutor;
 import org.spongepowered.api.entity.living.player.Player;
 
-public class CommandAbandonAllClaims implements CommandExecutor {
+import java.util.List;
+
+public class CommandClaimAbandonAll implements CommandExecutor {
 
     @Override
     public CommandResult execute(CommandSource src, CommandContext ctx) {
@@ -25,8 +28,8 @@ public class CommandAbandonAllClaims implements CommandExecutor {
             return CommandResult.success();
         }
         // count claims
-        PlayerData playerData = GriefPrevention.instance.dataStore.getPlayerData(player.getUniqueId());
-        int originalClaimCount = playerData.getClaims().size();
+        PlayerData playerData = GriefPrevention.instance.dataStore.getPlayerData(player.getWorld(), player.getUniqueId());
+        int originalClaimCount = playerData.playerWorldClaims.get(player.getWorld().getUniqueId()).size();
 
         // check count
         if (originalClaimCount == 0) {
@@ -39,16 +42,19 @@ public class CommandAbandonAllClaims implements CommandExecutor {
         }
 
         // adjust claim blocks
-        for (Claim claim : playerData.getClaims()) {
-            playerData.setAccruedClaimBlocks(
-                    playerData.getAccruedClaimBlocks() - (int) Math.ceil((claim.getArea() * (1 - GriefPrevention.instance.config_claims_abandonReturnRatio))));
+        List<Claim> claimList = playerData.playerWorldClaims.get(player.getWorld().getUniqueId());
+        for (Claim claim : claimList) {
+            // remove all context permissions
+            player.getSubjectData().clearPermissions(ImmutableSet.of(claim.getContext()));
+            playerData.setAccruedClaimBlocks(player.getWorld(),
+                    playerData.getAccruedClaimBlocks(player.getWorld()) - (int) Math.ceil((claim.getArea() * (1 - GriefPrevention.getActiveConfig(player.getWorld().getProperties()).getConfig().claim.abandonReturnRatio))));
         }
 
         // delete them
         GriefPrevention.instance.dataStore.deleteClaimsForPlayer(player.getUniqueId(), false);
 
         // inform the player
-        int remainingBlocks = playerData.getRemainingClaimBlocks();
+        int remainingBlocks = playerData.getRemainingClaimBlocks(player.getWorld());
         GriefPrevention.sendMessage(player, TextMode.Success, Messages.SuccessfulAbandon, String.valueOf(remainingBlocks));
 
         // revert any current visualization

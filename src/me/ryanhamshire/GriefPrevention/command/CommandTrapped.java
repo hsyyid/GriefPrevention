@@ -33,7 +33,7 @@ public class CommandTrapped  implements CommandExecutor {
         // FEATURE: empower players who get "stuck" in an area where they
         // don't have permission to build to save themselves
 
-        PlayerData playerData = GriefPrevention.instance.dataStore.getPlayerData(player.getUniqueId());
+        PlayerData playerData = GriefPrevention.instance.dataStore.getPlayerData(player.getWorld(), player.getUniqueId());
         Claim claim = GriefPrevention.instance.dataStore.getClaimAt(player.getLocation(), false, playerData.lastClaim);
 
         // if another /trapped is pending, ignore this slash command
@@ -80,7 +80,7 @@ public class CommandTrapped  implements CommandExecutor {
         Sponge.getGame().getScheduler().createTaskBuilder()
                 .delay(1, TimeUnit.SECONDS)
                 .execute(task)
-                .submit(this);
+                .submit(GriefPrevention.instance);
 
         return CommandResult.success();
     }
